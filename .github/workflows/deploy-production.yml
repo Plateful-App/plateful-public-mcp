@@ -51,7 +51,7 @@ jobs:
             --region europe-west2 \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars=LARAVEL_API_URL=https://api.plateful.uk/api,PORT=8080 \
+            --set-env-vars=LARAVEL_API_URL=https://api.plateful.uk/api \
             --project=${{ secrets.GCP_PROD_PROJECT_ID }}
 
       - name: Verify deployment

@@ -51,7 +51,7 @@ jobs:
             --region europe-west2 \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars=LARAVEL_API_URL=https://api-dot-plateful-sandbox-v2.nw.r.appspot.com/api,PORT=8080 \
+            --set-env-vars=LARAVEL_API_URL=https://api-dot-plateful-sandbox-v2.nw.r.appspot.com/api \
             --project=${{ secrets.GCP_SANDBOX_PROJECT_ID }}
 
       - name: Verify deployment
