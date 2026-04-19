@@ -1,0 +1,68 @@
+name: Deploy to Sandbox
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: public-mcp-sandbox-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run (Sandbox)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_SANDBOX_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SANDBOX_SA_EMAIL }}
+          project_id: ${{ secrets.GCP_SANDBOX_PROJECT_ID }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_SANDBOX_PROJECT_ID }}
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build Docker image
+        run: docker build -t gcr.io/${{ secrets.GCP_SANDBOX_PROJECT_ID }}/plateful-public-mcp .
+
+      - name: Push Docker image
+        run: docker push gcr.io/${{ secrets.GCP_SANDBOX_PROJECT_ID }}/plateful-public-mcp
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy plateful-public-mcp \
+            --image gcr.io/${{ secrets.GCP_SANDBOX_PROJECT_ID }}/plateful-public-mcp \
+            --region europe-west2 \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars=LARAVEL_API_URL=https://api-dot-plateful-sandbox-v2.nw.r.appspot.com/api,PORT=8080 \
+            --project=${{ secrets.GCP_SANDBOX_PROJECT_ID }}
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting 15 seconds for deployment to stabilise..."
+          sleep 15
+          HEALTH_URL=$(gcloud run services describe plateful-public-mcp --region europe-west2 --project=${{ secrets.GCP_SANDBOX_PROJECT_ID }} --format="value(status.url)")
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL/health")
+          echo "Health check returned: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::warning::Health check returned $HTTP_STATUS"
+          else
+            echo "Deployment verified successfully!"
+          fi
